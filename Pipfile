@@ -1,0 +1,17 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+isort = "*"
+
+[packages]
+celery = "*"
+django = "*"
+django-dramatiq = "*"
+dramatiq = {extras = ["rabbitmq", "watch"],version = "*"}
+django-extensions = "*"
+
+[requires]
+python_version = "3.8"
