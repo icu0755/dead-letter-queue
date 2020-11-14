@@ -1,4 +1,4 @@
-from contextlib import AbstractContextManager
+from functools import wraps
 
 from celery import Task, shared_task
 from celery.exceptions import Ignore, Reject, Retry, TaskPredicate
@@ -33,54 +33,59 @@ class MyTask(Task):
         print('{0!r} failed: {1!r}'.format(task_id, exc))
 
 
-@shared_task(
-    bind=True,  # binds task to the first arg
-    max_retries=2,
-    default_retry_delay=3,
-    acks_late=True,  # enable Reject to work
-    autoretry_for=(ZeroDivisionError,),
-    retry_backoff=10,
-)
-def celery_div(self, x, y):
-    with reject_on_error(self):
-        print(f'celery_div:{x},{y}')
-        # raise ValueError('foo')
-        print(f'div {x}/{y} = {x / y}')
+def reject_on_error_decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        task = args[0]
+        assert isinstance(task, Task), 'bind=True must be set to enable retries'
+        assert task.acks_late, 'acks_late=True must be set to send rejected tasks to the dead letter queue'
 
-
-class reject_on_error(AbstractContextManager):
-    def __init__(self, task: Task):
-        self._task = task
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is None:
-            return False
-
-        if not issubclass(exc_type, self._task.autoretry_for):
-            # reject if not in autoretry_for
-            raise Reject(exc_value, requeue=False)
+        retry_exc = None
+        try:
+            return func(*args, **kwargs)
+        except task.autoretry_for as exc:
+            retry_exc = exc
+        except Exception as exc:
+            raise Reject(exc, requeue=False)
 
         retry_backoff = int(
-            getattr(self._task, 'retry_backoff', False)
+            getattr(task, 'retry_backoff', False)
         )
         retry_backoff_max = int(
-            getattr(self._task, 'retry_backoff_max', 600)
+            getattr(task, 'retry_backoff_max', 600)
         )
-        retry_jitter = getattr(self._task, 'retry_jitter', True)
+        retry_jitter = getattr(task, 'retry_jitter', True)
         countdown = None
         if retry_backoff:
             countdown = get_exponential_backoff_interval(
-                            factor=retry_backoff,
-                            retries=self._task.request.retries,
-                            maximum=retry_backoff_max,
-                            full_jitter=retry_jitter)
-        print(f'countdown={countdown}')
+                factor=retry_backoff,
+                retries=task.request.retries,
+                maximum=retry_backoff_max,
+                full_jitter=retry_jitter)
 
         try:
-            raise self._task.retry(exc=exc_value, countdown=countdown)
+            raise task.retry(exc=retry_exc, countdown=countdown)
         except TaskPredicate:
             # pass through celery specific exceptions
             raise
         except Exception as exc:
             # reject if max_retries exceeded
             raise Reject(exc, requeue=False) from exc
+
+    return wrapper
+
+
+@shared_task(
+    bind=True,  # binds task to the first arg
+    base=MyTask,
+    max_retries=2,
+    default_retry_delay=3,
+    acks_late=True,  # enable Reject to work
+    autoretry_for=(ZeroDivisionError,),
+    retry_backoff=10,
+)
+@reject_on_error_decorator
+def celery_div(self, x, y):
+    print(f'celery_div:{x},{y}')
+    # raise ValueError('foo')
+    print(f'div {x}/{y} = {x / y}')
