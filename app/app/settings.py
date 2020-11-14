@@ -150,9 +150,9 @@ LOGGING = {
 CELERY_BROKER_URL = 'amqp://rabbitmq:rabbitmq@127.0.0.1:5672//'
 CELERY_TASK_QUEUES = [
     Queue('celery-default', routing_key='celery-default',
-          queue_arguments={'x-dead-letter-exchange': 'celery', 'x-dead-letter-routing-key': 'celery-default-XQ'}),
-    Queue('celery-default-XQ', routing_key='celery-default-XQ',
-          queue_arguments={'x-message-ttl': 604800000}),
+          queue_arguments={'x-dead-letter-exchange': 'celery-default-XQ', 'x-dead-letter-routing-key': 'celery-default-XQ'}),
+    Queue('celery-default2', routing_key='celery-default',
+          queue_arguments={'x-dead-letter-exchange': 'celery-default2-XQ', 'x-dead-letter-routing-key': 'celery-default2-XQ'}),
 ]
 CELERY_TASK_ROUTES = {
     'core.tasks.celery_div': {'queue': 'celery-default', 'routing_key': 'celery-default'},
