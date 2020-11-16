@@ -40,14 +40,9 @@ def reject_on_error_decorator(func):
         assert isinstance(task, Task), 'bind=True must be set to enable retries'
         assert task.acks_late, 'acks_late=True must be set to send rejected tasks to the dead letter queue'
 
-        retry_exc = None
-        try:
-            return func(*args, **kwargs)
-        except task.autoretry_for as exc:
-            retry_exc = exc
-        except Exception as exc:
-            raise Reject(exc, requeue=False)
-
+        autoretry_for = tuple(
+            getattr(task, 'autoretry_for', ())
+        )
         retry_backoff = int(
             getattr(task, 'retry_backoff', False)
         )
@@ -55,6 +50,7 @@ def reject_on_error_decorator(func):
             getattr(task, 'retry_backoff_max', 600)
         )
         retry_jitter = getattr(task, 'retry_jitter', True)
+
         countdown = None
         if retry_backoff:
             countdown = get_exponential_backoff_interval(
@@ -64,7 +60,13 @@ def reject_on_error_decorator(func):
                 full_jitter=retry_jitter)
 
         try:
-            raise task.retry(exc=retry_exc, countdown=countdown)
+            if not autoretry_for:
+                return func(*args, **kwargs)
+            else:
+                try:
+                    return func(*args, **kwargs)
+                except autoretry_for as retry_exc:
+                    raise task.retry(exc=retry_exc, countdown=countdown)
         except TaskPredicate:
             # pass through celery specific exceptions
             raise
