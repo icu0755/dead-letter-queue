@@ -148,6 +148,7 @@ LOGGING = {
 }
 
 CELERY_BROKER_URL = 'amqp://rabbitmq:rabbitmq@127.0.0.1:5672//'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1/0'
 CELERY_TASK_QUEUES = [
     Queue('celery-default', routing_key='celery-default',
           queue_arguments={'x-dead-letter-exchange': 'celery-default-XQ', 'x-dead-letter-routing-key': 'celery-default-XQ'}),

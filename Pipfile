@@ -7,7 +7,7 @@ verify_ssl = true
 isort = "*"
 
 [packages]
-celery = "*"
+celery = {extras = ["redis"],version = "*"}
 django = "*"
 django-dramatiq = "*"
 dramatiq = {extras = ["rabbitmq", "watch"],version = "*"}

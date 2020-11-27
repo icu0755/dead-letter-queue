@@ -1,3 +1,5 @@
+import random
+import time
 from functools import wraps
 
 from celery import Task, shared_task
@@ -91,3 +93,36 @@ def celery_div(self, x, y):
     print(f'celery_div:{x},{y}')
     # raise ValueError('foo')
     print(f'div {x}/{y} = {x / y}')
+
+
+@shared_task(
+    bind=True,
+    base=MyTask,
+)
+def tasks_composition(self):
+    print('tasks_composition started')
+    res1 = get_random.delay(0)
+    res2 = get_random.delay(1)
+    result = res1.get(disable_sync_subtasks=False) + res2.get(disable_sync_subtasks=False)
+    print(f'tasks_composition finished. result={result}')
+
+
+@shared_task(
+    bind=True,
+    base=MyTask,
+    max_retries=2,
+    retry_backoff=1,
+    autoretry_for=(Exception,),
+)
+def get_random(self, index=0):
+    wait = random.randint(0, 3)
+    print(f'get_random({index}) started. sleep {wait} sec')
+    time.sleep(wait)
+
+    if self.request.retries < 2:
+        print(f'get_random({index}) retries {self.request.retries}. raising an error')
+        raise Exception()
+
+    result = random.randint(0, 100)
+    print(f'get_random({index}) finished')
+    return result
