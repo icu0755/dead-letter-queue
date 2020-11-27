@@ -16,7 +16,7 @@ class Command(BaseCommand):
     def check_groups(self):
         # group1 runs 2 tasks in parallel. it is considered to be finished
         # when all tasks and retries were finished
-        group1 = group(get_random.si(0), get_random.si(1))
+        group1 = group(get_random.si(0).set(countdown=2), get_random.si(1).set(countdown=4))
 
         # group2 runs 2 tasks in parallel, when group1 is finished
         group2 = group(get_random.si(10), get_random.si(11))
