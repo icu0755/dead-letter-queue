@@ -1,12 +1,13 @@
 from celery import group
 from django.core.management.base import BaseCommand
 
-from core.tasks import celery_div, get_random, tasks_composition
+from core.tasks import celery_div, failure, get_random, tasks_composition
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        self.check_groups()
+        # self.check_groups()
+        self.check_chain_failure()
         # self.check_dead_letter()
         # tasks_composition.delay()
 
@@ -21,4 +22,12 @@ class Command(BaseCommand):
         # group2 runs 2 tasks in parallel, when group1 is finished
         group2 = group(get_random.si(10), get_random.si(11))
         chain = group1 | group2
+        chain.delay()
+
+    def check_chain_failure(self):
+        # group1 runs 2 tasks in parallel.
+        group1 = group(failure.si(0).set(countdown=2), get_random.si(1).set(countdown=4))
+
+        # get_random won't run because one of the tasks in group1 has failed
+        chain = group1 | get_random.si(10)
         chain.delay()

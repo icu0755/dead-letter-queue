@@ -126,3 +126,19 @@ def get_random(self, index=0):
     result = random.randint(0, 100)
     print(f'get_random({index}) finished')
     return result
+
+
+@shared_task(
+    bind=True,
+    base=MyTask,
+    max_retries=2,
+    retry_backoff=1,
+    autoretry_for=(Exception,),
+)
+def failure(self, index=0):
+    wait = random.randint(0, 3)
+    print(f'failure({index}) started. sleep {wait} sec')
+    time.sleep(wait)
+
+    print(f'failure({index}) raising an error')
+    raise Exception()
